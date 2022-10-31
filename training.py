@@ -1,4 +1,6 @@
 
+from email import header
+import matplotlib
 from numpy import mean
 from ple.games.flappybird import FlappyBird
 from ple import PLE
@@ -7,7 +9,7 @@ import matplotlib.pyplot as plt
 import pickle
 import os
 from datetime import datetime
-from pathlib import Path
+import matplotlib.pyplot as plt
 
 from agents import *
 
@@ -60,13 +62,13 @@ def train(nb_episodes, agent: FlappyAgent, display_screen=False, force_fps=True)
         score += reward
         # reset the environment if the game is over
         if env.game_over():
-            # print("score for this episode: %d" % score)
+            print("score for this episode: %d" % score)
             env.reset_game()
             nb_episodes -= 1
             score = 0
 
 
-def observe_policy(agent, total_nb_episodes, numberOfObservations = 10):
+def observe_policy_heatmap(agent, total_nb_episodes, numberOfObservations = 10):
     reward_values = agent.reward_values()
     env = PLE(FlappyBird(), fps=30, display_screen=False, force_fps=True, rng=None,
             reward_values = reward_values)
@@ -105,7 +107,7 @@ def observe_policy(agent, total_nb_episodes, numberOfObservations = 10):
                 env.reset_game()
                 nb_episodes -= 1
                 score = 0
-
+        
         nb_episodes = total_nb_episodes//numberOfObservations
         agent.plot("pi")
         agent.fig.savefig(agentFolder + f"/plots/heatmap{i + 1}")
@@ -114,7 +116,61 @@ def observe_policy(agent, total_nb_episodes, numberOfObservations = 10):
     with open (agentFolder + "/" + agent.__class__.__name__, 'wb') as pickle_file:
         pickle.dump(agent, pickle_file)
 
+def observe_policy_task3(agent, total_nb_episodes, numberOfObservations = 10):
+    reward_values = agent.reward_values()
+    env = PLE(FlappyBird(), fps=30, display_screen=False, force_fps=True, rng=None,
+            reward_values = reward_values)
+    env.init()
+
+    nb_episodes = total_nb_episodes//numberOfObservations
+    score = 0
+    
+    now = datetime.now().strftime("%d-%m-%Y_%H %M %S")
+    dirname = os.path.dirname(__file__)
+    agentFolder = os.path.join(dirname, f"results/{now}")
+    if not os.path.exists(agentFolder):
+        os.makedirs(agentFolder)
+
+    if not os.path.exists(agentFolder + "/plots"):
+        os.makedirs(agentFolder + "/plots")
+
+    for i in range(numberOfObservations):
+        while nb_episodes > 0:
+            # pick an action
+            state = env.game.getGameState()
+            action = agent.training_policy(state)
+
+            # step the environment
+            reward = env.act(env.getActionSet()[action])
+            # print("reward=%d" % reward)
+
+            # let the agent observe the current state transition
+            newState = env.game.getGameState()
+            agent.observe(state, action, reward, newState, env.game_over())
+
+            score += reward
+            # reset the environment if the game is over
+            if env.game_over():
+                # print("score for this episode: %d" % score)
+                env.reset_game()
+                nb_episodes -= 1
+                score = 0
+        
+        nb_episodes = total_nb_episodes//numberOfObservations
+    fig = plt.figure()
+    plt.plot(agent.loss, label="Log2 Loss")
+    plt.legend()
+    plt.xlabel("Number of episodes")
+    fig.savefig(agentFolder + f"/plots/loss")
+    
+    print("saving pickle")
+    with open (agentFolder + "/" + agent.__class__.__name__, 'wb') as pickle_file:
+        pickle.dump(agent, pickle_file)
+        
+        
 if __name__ == "__main__":
 
-    agent = TaskOneAgent()
-    observe_policy(agent, 10000)
+    agent = TaskThreeAgent()
+    observe_policy_task3(agent, 50, 1)
+    input('press enter to play: ')
+    
