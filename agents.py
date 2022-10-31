@@ -90,7 +90,35 @@ class BaseAgent(FlappyAgent):
 
     def policy(self, state):
         return super().policy(state)
-
+        
+    def lplot(self, scores, split):
+            if self.fig == None:
+                self.fig = plt.figure()
+            else:
+                plt.figure(self.fig.number)
+            plt.clf()
+            xData = []
+            yData = []
+            mData = []
+            mean_score = 0
+            max_score = 0
+            counter = 0
+            for i in range(len(scores)):
+                if (max_score < scores[i]):
+                    max_score = scores[i]
+                mean_score += scores[i]
+                counter += 1
+                if (counter == split):
+                    xData.append(i)
+                    yData.append(mean_score / split)
+                    mData.append(max_score)
+                    max_score = 0
+                    mean_score = 0
+                    counter = 0
+            df = {'Episodes':xData, 'Score':yData, 'Max Score':mData}
+            sns.lineplot(data=df, x='Episodes', y='Score')
+            sns.lineplot(data=df, x='Episodes', y='Max Score')
+            plt.legend(labels=['Score', 'Max Score'])
     
 
 class TaskTwoAgent(BaseAgent):
@@ -230,3 +258,71 @@ class TaskThreeAgent(BaseAgent):
             normalize(state[2], -8, 10),
             normalize(state[3], 1, 15),
         )
+        
+class TaskFourAgent(BaseAgent):
+    def __init__(self):
+        super().__init__()
+        self.q_values = {}
+        self.initialize_q_values()
+        self.epsilon = 0.1
+        self.alpha = 0.7
+        self.gamma = 0.95
+        self.realScore = 0
+        
+    def initialize_q_values(self):
+        """
+        Creates the q table with all states actions equal to 0
+        meaning that the agent knowns nothing about the env.
+        """
+        for player_y in range(1,self.interval+1):
+            for next_pipe_top_y in range(1,self.interval+1):
+                for next_pipe_dist_to_player in range(1,self.interval+1):
+                    for player_vel in range(-8,11):
+                        self.q_values[(next_pipe_top_y, player_y, player_vel, next_pipe_dist_to_player )] = [0, 0] #(flap, do nothing)
+
+    def q(self, s,a):
+        return self.q_values[self.state_to_internal_state(s)][a]
+
+    def reward_values(self):
+        return {"positive": 1.0, "tick": 0.0, "loss": -5.0}
+
+    def observe(self, s1, a, r, s2, end):
+        self.frames_observed += 1
+        if end : self.episodes_observed+=1
+        self.q_values[self.state_to_internal_state(s1)][a]= self.q(s1,a) + self.alpha * (r + self.gamma * max([self.q(s2,0), self.q(s2,1)]) - self.q(s1,a))
+            
+    def training_policy(self, state):
+
+        n = random.uniform(0, 1)
+        if n < self.epsilon:
+            return random.randint(0,1)
+        else:
+            actions = self.q_values[self.state_to_internal_state(state)]
+            # print(actions)
+            return actions.index(max(actions))
+
+    def policy(self, state):
+        state =self.state_to_internal_state(state)
+        actions = self.q_values[state]
+        return actions.index(max(actions))
+    
+    def plot(self, what):
+        data = [k + tuple(self.q_values[k]) for k in self.q_values.keys()]
+        if self.fig == None:
+            self.fig = plt.figure()
+        else:
+            plt.figure(self.fig.number)
+            
+        df = pd.DataFrame(data=data, columns=('next_pipe_top_y', 'player_y', 'player_vel', 'next_pipe_dist_to_player', 'q_flap', 'q_noop'))
+        df['delta_y'] = df['player_y'] - df['next_pipe_top_y']
+        df['v'] = df[['q_noop', 'q_flap']].max(axis=1)
+        df['pi'] = (df[['q_noop', 'q_flap']].idxmax(axis=1) == 'q_flap')*1
+        selected_data = df.groupby(['delta_y','next_pipe_dist_to_player'], as_index=False).mean()
+        plt.clf()
+        with sns.axes_style("white"):
+            if what in ('q_flap', 'q_noop', 'v'):
+                ax = sns.heatmap(selected_data.pivot('delta_y','next_pipe_dist_to_player',what), vmin=-5, vmax=5, cmap='coolwarm', annot=True, fmt='.2f')
+            elif what == 'pi':
+                ax = sns.heatmap(selected_data.pivot('delta_y','next_pipe_dist_to_player', 'pi'), vmin=0, vmax=1, cmap='coolwarm')
+        ax.invert_xaxis()
+        ax.set_title(what + ' after ' + str(self.frames_observed) + ' frames / ' + str(self.episodes_observed) + ' episodes')
