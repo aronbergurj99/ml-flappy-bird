@@ -139,7 +139,6 @@ class TaskTwoAgent(BaseAgent):
                 for next_pipe_dist_to_player in range(1,self.interval+1):
                     for player_vel in range(-8,11):
                         self.q_values[(next_pipe_top_y, player_y, player_vel, next_pipe_dist_to_player )] = [0, 0] #(flap, do nothing)
-
     def q(self, s,a):
         return self.q_values[self.state_to_internal_state(s)][a]
 
@@ -263,11 +262,14 @@ class TaskFourAgent(BaseAgent):
     def __init__(self):
         super().__init__()
         self.q_values = {}
+        self.interval=15
         self.initialize_q_values()
         self.epsilon = 0.1
-        self.alpha = 0.7
-        self.gamma = 0.95
-        self.realScore = 0
+        self.alpha = 0.1
+        self.gamma = 1
+        self.replayBufferSize = 50
+        self.batchSizse = 25
+        self.replayBuffer = []
         
     def initialize_q_values(self):
         """
@@ -279,18 +281,29 @@ class TaskFourAgent(BaseAgent):
                 for next_pipe_dist_to_player in range(1,self.interval+1):
                     for player_vel in range(-8,11):
                         self.q_values[(next_pipe_top_y, player_y, player_vel, next_pipe_dist_to_player )] = [0, 0] #(flap, do nothing)
-
+    
     def q(self, s,a):
         return self.q_values[self.state_to_internal_state(s)][a]
 
     def reward_values(self):
-        return {"positive": 1.0, "tick": 0.0, "loss": -5.0}
-
+        return {"positive": 1.0, "tick": 0.0, "loss": -5}
+    
+    def update_q_table(self, s1, a, r, s2, end):
+        self.q_values[self.state_to_internal_state(s1)][a]=  self.q(s1,a) + self.alpha * (r + self.gamma * max([self.q(s2,0), self.q(s2,1)]) - self.q(s1,a))
+        
+    
     def observe(self, s1, a, r, s2, end):
         self.frames_observed += 1
-        if end : self.episodes_observed+=1
-        self.q_values[self.state_to_internal_state(s1)][a]= self.q(s1,a) + self.alpha * (r + self.gamma * max([self.q(s2,0), self.q(s2,1)]) - self.q(s1,a))
-            
+        if end: 
+            self.episodes_observed+=1
+        
+        self.replayBuffer.append((s1,a,r,s2,end))
+        if len(self.replayBuffer) > self.replayBufferSize:
+            self.replayBuffer.pop(0)
+        
+        for i in range(self.batchSizse):
+            self.update_q_table(*random.choice(self.replayBuffer))
+        
     def training_policy(self, state):
 
         n = random.uniform(0, 1)
@@ -305,24 +318,55 @@ class TaskFourAgent(BaseAgent):
         state =self.state_to_internal_state(state)
         actions = self.q_values[state]
         return actions.index(max(actions))
-    
-    def plot(self, what):
-        data = [k + tuple(self.q_values[k]) for k in self.q_values.keys()]
-        if self.fig == None:
-            self.fig = plt.figure()
-        else:
-            plt.figure(self.fig.number)
+
+class Task4Agent2(BaseAgent):
+    def __init__(self):
+        super().__init__()
+        self.q_values = {}
+        self.interval=20
+        self.initialize_q_values()
+        self.epsilon = 0.1
+        self.alpha = 0.1
+        
+    def initialize_q_values(self):
+        """
+        Creates the q table with all states actions equal to 0
+        meaning that the agent knowns nothing about the env.
+        """
+        for delta_y in range(1,self.interval+1):
+            for next_pipe_dist_to_player in range(1,self.interval+1):
+                for player_vel in range(-8,11):
+                    for close_to_ground in [True, False]:
+                        self.q_values[(delta_y, player_vel, next_pipe_dist_to_player, close_to_ground )] = [0, 0] #(flap, do nothing)
+    def q(self, s,a):
+        return self.q_values[self.state_to_internal_state(s)][a]
+
+    def reward_values(self):
+        return {"positive": 1.0, "tick": 0.0, "loss": -5.0}
+
+
+    def observe(self, s1, a, r, s2, end):
+        self.frames_observed += 1
+        if end : self.episodes_observed+=1
+        self.q_values[self.state_to_internal_state(s1)][a]= self.q(s1,a) + self.alpha * (r + max([self.q(s2,0), self.q(s2,1)]) - self.q(s1,a))
             
-        df = pd.DataFrame(data=data, columns=('next_pipe_top_y', 'player_y', 'player_vel', 'next_pipe_dist_to_player', 'q_flap', 'q_noop'))
-        df['delta_y'] = df['player_y'] - df['next_pipe_top_y']
-        df['v'] = df[['q_noop', 'q_flap']].max(axis=1)
-        df['pi'] = (df[['q_noop', 'q_flap']].idxmax(axis=1) == 'q_flap')*1
-        selected_data = df.groupby(['delta_y','next_pipe_dist_to_player'], as_index=False).mean()
-        plt.clf()
-        with sns.axes_style("white"):
-            if what in ('q_flap', 'q_noop', 'v'):
-                ax = sns.heatmap(selected_data.pivot('delta_y','next_pipe_dist_to_player',what), vmin=-5, vmax=5, cmap='coolwarm', annot=True, fmt='.2f')
-            elif what == 'pi':
-                ax = sns.heatmap(selected_data.pivot('delta_y','next_pipe_dist_to_player', 'pi'), vmin=0, vmax=1, cmap='coolwarm')
-        ax.invert_xaxis()
-        ax.set_title(what + ' after ' + str(self.frames_observed) + ' frames / ' + str(self.episodes_observed) + ' episodes')
+    def training_policy(self, state):
+        n = random.uniform(0, 1)
+        if n < self.epsilon:
+            return random.randint(0,1)
+        else:
+            actions = self.q_values[self.state_to_internal_state(state)]
+            # print(actions)
+            return actions.index(max(actions))
+
+    def policy(self, state):
+        actions = self.q_values[self.state_to_internal_state(state)]
+        return actions.index(max(actions))
+        
+    def state_to_internal_state(self, state):
+        return (
+            split_to_interval(-512, 512, state["player_y"] - state["next_pipe_top_y"], self.interval),
+            max(-8, min(state["player_vel"], 10)), #clamp the value
+            split_to_interval(0, 288, state["next_pipe_dist_to_player"], self.interval),
+            state["player_y"] > 300, #close to ground 
+        )

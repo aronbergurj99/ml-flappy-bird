@@ -69,7 +69,7 @@ def train(nb_episodes, agent: FlappyAgent, display_screen=False, force_fps=True)
 
 
 
-def observe_policy(agent, total_nb_episodes, numberOfObservations = 10):
+def observe_policy(agent, total_nb_episodes, numberOfObservations = 10, heatmap=True):
     reward_values = agent.reward_values()
     env = PLE(FlappyBird(), fps=30, display_screen=False, force_fps=True, rng=None,
             reward_values = reward_values)
@@ -105,6 +105,11 @@ def observe_policy(agent, total_nb_episodes, numberOfObservations = 10):
             agent.observe(state, action, reward, newState, env.game_over())
 
             score += reward
+            if score > 100:
+                env.reset_game()
+                nb_episodes -= 1
+                score = 0
+                
             # reset the environment if the game is over
             percent = (agent.episodes_observed / total_nb_episodes) * 100
             if (percent % 1 == 0 and percent != last_percent):
@@ -132,13 +137,14 @@ def observe_policy(agent, total_nb_episodes, numberOfObservations = 10):
         scores.append(tmp_scores)
         
         nb_episodes = total_nb_episodes//numberOfObservations
-    agent.plot("pi")
-    agent.fig.savefig(agentFolder + f"/plots/heatmap")
+    if heatmap:
+        agent.plot("pi")
+        agent.fig.savefig(agentFolder + f"/plots/heatmap")
     # agent.lplot(scores, 10)
     # agent.fig.savefig(agentFolder + f"/plots/lineplot")
     df = pd.DataFrame({
         "mean score over 10 episodes" : [mean(score) for score in scores],
-        "max score over 10 episodes"  : [max(score) for score in scores]
+        # "max score over 10 episodes"  : [max(score) for score in scores]
     }, index = [(i+1) * (total_nb_episodes // numberOfObservations )for i in range(numberOfObservations)])
     ax = df.plot.line()
     ax.set_xlabel("Number of episodes trained")
@@ -205,5 +211,5 @@ if __name__ == "__main__":
     # agent = TaskThreeAgent()
     # observe_policy_task3(agent, 50, 1)
     
-    agent = TaskTwoAgent()
-    observe_policy(agent, 10000, 50)
+    agent = Task4Agent2()
+    observe_policy(agent, 1000, 50, heatmap=False)
