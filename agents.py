@@ -325,12 +325,12 @@ class Task4Agent2(BaseAgent):
         self.q_values = {}
         
         self.delta_y_interval=20
-        self.pipe1_interval=10
-        self.pipe2_interval=10
+        self.pipe1_interval=4
         
         self.initialize_q_values()
-        self.epsilon = 0.1
-        self.alpha = 0.1
+        self.epsilon = 0.025
+        self.alpha = 0.03
+        self.gamma = 0.96
         
     def initialize_q_values(self):
         """
@@ -346,13 +346,13 @@ class Task4Agent2(BaseAgent):
         return self.q_values[self.state_to_internal_state(s)][a]
 
     def reward_values(self):
-        return {"positive": 1.0, "tick": 0.0, "loss": -5.0}
+        return {"positive": 1, "tick": 0.0, "loss": -5.0}
 
 
     def observe(self, s1, a, r, s2, end):
         self.frames_observed += 1
         if end : self.episodes_observed+=1
-        self.q_values[self.state_to_internal_state(s1)][a]= self.q(s1,a) + self.alpha * (r + max([self.q(s2,0), self.q(s2,1)]) - self.q(s1,a))
+        self.q_values[self.state_to_internal_state(s1)][a]= self.q(s1,a) + self.alpha * (r + self.gamma * max([self.q(s2,0), self.q(s2,1)]) - self.q(s1,a))
             
     def training_policy(self, state):
         n = random.uniform(0, 1)
