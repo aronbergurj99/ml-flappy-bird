@@ -128,12 +128,20 @@ def observe_policy(agent, total_nb_episodes, numberOfObservations = 10, heatmap=
             action = agent.policy(env.game.getGameState())
             reward = env.act(env.getActionSet()[action])
             score += reward
+            
+            # if(score > 50):
+            #     env.reset_game()
+            #     tmp_scores.append(score)
+            #     score = 0
+            #     nb_episodes-=1
+            
             if env.game_over():
                 # print("score for this episode: %d" % score)
                 env.reset_game()
                 tmp_scores.append(score)
                 score = 0
                 nb_episodes-=1
+            
         scores.append(tmp_scores)
         
         nb_episodes = total_nb_episodes//numberOfObservations
@@ -212,4 +220,4 @@ if __name__ == "__main__":
     # observe_policy_task3(agent, 50, 1)
     
     agent = Task4Agent2()
-    observe_policy(agent, 1000, 50, heatmap=False)
+    observe_policy(agent, 400, 10, heatmap=False)

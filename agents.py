@@ -323,7 +323,11 @@ class Task4Agent2(BaseAgent):
     def __init__(self):
         super().__init__()
         self.q_values = {}
-        self.interval=20
+        
+        self.delta_y_interval=20
+        self.pipe1_interval=10
+        self.pipe2_interval=10
+        
         self.initialize_q_values()
         self.epsilon = 0.1
         self.alpha = 0.1
@@ -333,8 +337,8 @@ class Task4Agent2(BaseAgent):
         Creates the q table with all states actions equal to 0
         meaning that the agent knowns nothing about the env.
         """
-        for delta_y in range(1,self.interval+1):
-            for next_pipe_dist_to_player in range(1,self.interval+1):
+        for delta_y in range(1,self.delta_y_interval+1):
+            for next_pipe_dist_to_player in range(1,self.pipe1_interval+1):
                 for player_vel in range(-8,11):
                     for close_to_ground in [True, False]:
                         self.q_values[(delta_y, player_vel, next_pipe_dist_to_player, close_to_ground )] = [0, 0] #(flap, do nothing)
@@ -365,8 +369,8 @@ class Task4Agent2(BaseAgent):
         
     def state_to_internal_state(self, state):
         return (
-            split_to_interval(-512, 512, state["player_y"] - state["next_pipe_top_y"], self.interval),
+            split_to_interval(-512, 512, state["player_y"] - state["next_pipe_top_y"], self.delta_y_interval),
             max(-8, min(state["player_vel"], 10)), #clamp the value
-            split_to_interval(0, 288, state["next_pipe_dist_to_player"], self.interval),
+            split_to_interval(0, 288, state["next_pipe_dist_to_player"], self.pipe1_interval),
             state["player_y"] > 300, #close to ground 
         )
